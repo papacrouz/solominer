@@ -117,13 +117,11 @@ class ExitedThread(threading.Thread):
 
 
 
-def bitcoin_miner(t, restarted=False):
+def bitcoin_miner(t, restarted=False, reason=None):
 
     if restarted:
-        logg('[*] Bitcoin Miner restarted')
+        logg(reason)
         time.sleep(10)
-
-
 
 
     target = (ctx.nbits[2:]+'00'*(int(ctx.nbits[:2],16) - 3)).zfill(64)
@@ -185,7 +183,7 @@ def bitcoin_miner(t, restarted=False):
             logg('[*] New block {} detected on network '.format(ctx.prevhash))
             logg('[*] Best difficulty will trying to solve block {} was {}'.format(work_on+1, ctx.nHeightDiff[work_on+1]))
             ctx.updatedPrevHash = ctx.prevhash
-            bitcoin_miner(t, restarted=True)
+            bitcoin_miner(t, restarted=True, reason="New block detected on network")
             break 
 
 
@@ -237,8 +235,16 @@ def bitcoin_miner(t, restarted=False):
             ret = ctx.sock.recv(1024)
             logg('[*] Pool response: {}'.format(ret))
             return True
+
         
-        # increment nonce by 1, in case we don't want random 
+        # increment nonce by 1, in case we don't want random.
+        # we mnust sure that we don't gona run above 2^32
+        if nNonce+1 > 4294967296:
+            # Miner should restarted here. We gona run out of space.
+            # We don't abandon the work, the restart of the miner reason is 
+            # to generate a new extranonce, that will give us a lot of space.
+            bitcoin_miner(t, restarted=True, reason="Updating ExtraNonce")
+
         nNonce +=1
 
 
